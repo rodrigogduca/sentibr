@@ -1,0 +1,7 @@
+{
+  "C": 0.5,
+  "stopwords": false,
+  "strip_accents": "unicode",
+  "f1_macro_cv": 0.6744,
+  "f1_macro_validacao": 0.6804
+}

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>SentiBR — Relatório Técnico</title>
+<style>
+  @page { size: A4; margin: 16mm 17mm; }
+  body { font-family: "Segoe UI", Calibri, Arial, sans-serif; font-size: 10pt; line-height: 1.42; color: #1a1a1a; }
+  h1 { font-size: 16pt; margin: 0 0 4px; }
+  h2 { font-size: 11.5pt; margin: 14px 0 5px; padding-bottom: 2px; border-bottom: 1.5px solid #c9d3e0; color: #16335c; }
+  p { margin: 4px 0 6px; text-align: justify; }
+  ul { margin: 3px 0 6px; padding-left: 18px; }
+  li { margin: 2px 0; }
+  .meta { font-size: 9pt; color: #333; margin-bottom: 8px; }
+  .meta div { margin: 1px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 9pt; margin: 6px 0; }
+  th, td { border: 1px solid #c7ccd4; padding: 3px 6px; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  th { background: #eef2f7; }
+  tr.destaque td { font-weight: 600; background: #f3f8ef; }
+  .figs { display: flex; gap: 10px; justify-content: center; margin: 6px 0; }
+  .figs img { width: 48%; border: 1px solid #ddd; }
+  .app { width: 78%; display: block; margin: 6px auto; border: 1px solid #ddd; }
+  .legenda { font-size: 8.5pt; color: #555; text-align: center; margin-top: 0; }
+  pre { font-family: Consolas, monospace; font-size: 8.3pt; background: #f6f7f9; border: 1px solid #e1e4e8; padding: 6px 8px; white-space: pre; }
+  code { font-family: Consolas, monospace; font-size: 8.8pt; }
+  .quebra { page-break-before: always; }
+</style>
+</head>
+<body>
+
+<h1>SentiBR: classificação de sentimento em avaliações de clientes em português</h1>
+<div class="meta">
+  <div><b>Autor:</b> Rodrigo Gandarela Soares de Farias Duca — Engenharia de Computação, Universidade SENAI CIMATEC</div>
+  <div><b>Vínculo:</b> AWS Student Builder Group (Core Team Member) · <b>Período:</b> 21/09/2026 – 22/09/2026</div>
+  <div><b>Repositório:</b> https://github.com/rodrigogduca/sentibr</div>
+  <div><b>Temáticas:</b> Processamento de Linguagem Natural, Deep Learning (transformers),
+    aprendizado supervisionado, análise de sentimentos, vieses algorítmicos</div>
+</div>
+
+<h2>1. Problema e motivação</h2>
+<p>Empresas de varejo recebem milhares de avaliações em texto livre, e ler todas à mão é inviável.
+Reclamações urgentes se perdem no meio de elogios, e a nota de 1 a 5 nem sempre reflete o que o texto diz.
+O SentiBR classifica cada comentário como <b>negativo, neutro ou positivo</b>, com a probabilidade de cada
+classe, para priorizar o atendimento e medir a satisfação. O projeto também compara uma abordagem clássica
+com um transformer, para quantificar o ganho real do deep learning e o custo dele.</p>
+
+<h2>2. Dados</h2>
+<p><b>Fonte:</b> <i>Brazilian E-Commerce Public Dataset by Olist</i> (Kaggle, licença CC BY-NC-SA 4.0),
+com 99.224 avaliações reais e anonimizadas de 2016 a 2018. <b>Alvo:</b> derivado da nota do cliente
+(1–2 = negativo, 3 = neutro, 4–5 = positivo), ou seja, supervisão fraca.</p>
+<ul>
+  <li><b>Preparo:</b> título + mensagem → normalização de espaços → descarte de textos com menos de 3 caracteres
+    (restam 42.377) → <b>deduplicação</b> ignorando caixa (restam 36.422), para evitar vazamento entre treino e teste.</li>
+  <li><b>Divisão:</b> 70/15/15 estratificada, seed 42: 25.495 / 5.463 / 5.464. Um <code>assert</code> e um teste
+    automatizado garantem que treino e teste não compartilham textos.</li>
+  <li><b>Desbalanceamento:</b> 62,4% positivo, 28,6% negativo e só <b>9,0% neutro</b>. Por isso a métrica principal
+    é o F1-macro, e os dois modelos usam pesos de classe.</li>
+</ul>
+
+<h2>3. Metodologia</h2>
+<pre>Olist → dados.py (limpar, rotular, deduplicar, dividir) → treino | validação | teste
+          ├─ baseline.py      TF-IDF (1–2 gramas) + Regressão Logística balanceada, GridSearchCV no treino
+          └─ treinar_bert.py  BERTimbau, 2 épocas, cross-entropy ponderada
+       → avaliar.py (mesmo teste para todos: métricas, matriz de confusão, latência) → app Streamlit</pre>
+<ul>
+  <li><b>Piso (E1):</b> classificador da classe majoritária.</li>
+  <li><b>Baseline (E2):</b> TF-IDF com unigramas e bigramas + Regressão Logística com <code>class_weight="balanced"</code>.
+    Busca em grade (validação cruzada de 3 partes, só no treino) sobre a regularização C, a remoção de stopwords e a remoção
+    de acentos. As <b>negações</b> ("não", "nunca", "nem"…) nunca são removidas. Melhor configuração: C = 0,5, sem
+    stopwords, sem acentos.</li>
+  <li><b>Transformer (E4):</b> fine-tuning do BERTimbau (<code>neuralmind/bert-base-portuguese-cased</code>), com até
+    128 tokens, taxa de aprendizado 2e-5, warmup de 10%, fp16, em uma GPU RTX 3050 de 6 GB (~10 min). A perda é uma
+    <b>cross-entropy ponderada</b> pelo inverso da frequência das classes (pesos 1,16 / 3,72 / 0,53), implementada em
+    uma subclasse do <code>Trainer</code>. Uma versão sem pesos foi mantida como <b>ablação</b>.</li>
+  <li><b>Protocolo:</b> hiperparâmetros escolhidos só com treino e validação; teste avaliado uma única vez por modelo;
+    latência medida em CPU, prevendo um texto por vez.</li>
+</ul>
+
+<h2>4. Resultados</h2>
+<table>
+  <tr><th>Modelo</th><th>F1-macro</th><th>Acurácia</th><th>F1 neg.</th><th>F1 neutro</th><th>Recall neutro</th><th>F1 pos.</th><th>Latência CPU</th></tr>
+  <tr><td>Classe majoritária (piso)</td><td>0,256</td><td>0,624</td><td>0,00</td><td>0,00</td><td>0,00</td><td>0,77</td><td>—</td></tr>
+  <tr><td>TF-IDF + LogReg (baseline)</td><td>0,682</td><td>0,806</td><td>0,81</td><td>0,34</td><td>0,47</td><td>0,90</td><td>1,6 ms</td></tr>
+  <tr><td>BERTimbau sem pesos (ablação)</td><td>0,674</td><td>0,866</td><td>0,86</td><td>0,23</td><td>0,17</td><td>0,94</td><td>—</td></tr>
+  <tr class="destaque"><td>BERTimbau com pesos</td><td>0,721</td><td>0,847</td><td>0,85</td><td>0,38</td><td>0,47</td><td>0,93</td><td>73 ms</td></tr>
+</table>
+
+<div class="figs">
+  <img src="figuras/matriz_confusao_baseline_logreg.png" alt="Matriz de confusão do baseline">
+  <img src="figuras/matriz_confusao_bertimbau.png" alt="Matriz de confusão do BERTimbau">
+</div>
+<p class="legenda">Matrizes de confusão normalizadas por linha (recall) no conjunto de teste: baseline (esq.) e BERTimbau com pesos (dir.).</p>
+
+<ul>
+  <li><b>O BERTimbau supera o baseline em +0,039 de F1-macro</b> (0,721 contra 0,682), acima da meta de +0,03 fixada
+    antes dos experimentos. O ganho vem principalmente das classes negativa (+0,05) e neutra (+0,04).</li>
+  <li><b>A ablação mostra que a acurácia engana.</b> Sem pesos, o BERT tem a maior acurácia (0,866), mas o recall do
+    neutro cai para 0,17, e o F1-macro fica <i>abaixo</i> do baseline. A ponderação da perda recupera o neutro sem
+    sacrificar as outras classes.</li>
+  <li><b>Custo × benefício:</b> o transformer é ~47× mais lento em CPU (73 ms contra 1,6 ms por texto), mas continua bem
+    abaixo do requisito de 1 s. O baseline segue útil para volumes muito altos ou hardware limitado.</li>
+</ul>
+
+<h2 class="quebra">5. Análise de erros</h2>
+<p>Foram lidos e categorizados 40 erros sorteados do BERTimbau (detalhes em <code>reports/erros.md</code>):</p>
+<table>
+  <tr><th>Categoria</th><th>Erros</th><th>Exemplo</th></tr>
+  <tr><td>Sentimento misto</td><td>12</td><td style="text-align:left">"Controle bom. Mas demora muito a entrega." (positivo → neutro)</td></tr>
+  <tr><td>Ruído de rótulo</td><td>10</td><td style="text-align:left">"Cartuchos falsos. Não recomendo…" com nota 4–5 (o modelo está certo)</td></tr>
+  <tr><td>Reclamação implícita</td><td>6</td><td style="text-align:left">"Bem diferente da foto" (negativo → neutro)</td></tr>
+  <tr><td>Fronteira entre classes vizinhas</td><td>4</td><td style="text-align:left">"Não chegou até minha casa. Tive que ir buscar" (neutro → negativo)</td></tr>
+  <tr><td>Texto curto/ambíguo</td><td>4</td><td style="text-align:left">"kkkkkkkkkkkkkk" (neutro → positivo)</td></tr>
+  <tr><td>Negação/contrafactual</td><td>2</td><td style="text-align:left">"o produto não foi recebido ainda por falta minha" (positivo → negativo)</td></tr>
+  <tr><td>Erro claro do modelo</td><td>2</td><td style="text-align:left">"Bom. Gostei do produto comprei de presente" (positivo → neutro)</td></tr>
+</table>
+<p><b>35 dos 40 erros envolvem a classe neutra</b>, e só 5 são confusões diretas entre negativo e positivo, 4 delas por
+ruído de rótulo. Isso indica que a métrica tem um teto imposto pelo próprio rótulo, e que boa parte do "neutro" é, na
+verdade, sentimento misto, que uma única etiqueta não descreve.</p>
+
+<img class="app" src="figuras/app.png" alt="Interface do SentiBR">
+<p class="legenda">Interface Streamlit: classificação de um comentário com o BERTimbau. O app também processa CSVs em lote e mostra as métricas dos modelos.</p>
+
+<h2>6. Vieses, limitações e ética</h2>
+<ul>
+  <li><b>Domínio:</b> treinado em e-commerce, pode errar em outros contextos (saúde, política, redes sociais). O app exibe esse aviso.</li>
+  <li><b>Rótulo ruidoso:</b> a nota do cliente contradiz o texto em ~25% dos erros analisados. Um teste revisado à mão daria
+    uma medida mais honesta.</li>
+  <li><b>Viés linguístico:</b> gírias regionais e erros de digitação estão sub-representados, e o desempenho pode variar
+    conforme o autor. Não há dados demográficos para medir isso, o que é correto pela LGPD, e fica registrado como limitação.</li>
+  <li><b>Uso previsto:</b> triagem com revisão humana. O modelo não deve ser usado para decidir sobre pessoas (por exemplo,
+    avaliar ou punir atendentes). Dados públicos e anonimizados; nenhuma informação pessoal é exibida.</li>
+</ul>
+
+<h2>7. Conclusão e próximos passos</h2>
+<p>O projeto entregou um classificador de sentimento reprodutível, com especificação, testes, avaliação justa e interface.
+O transformer superou o baseline, mas a principal lição foi metodológica: com classes desbalanceadas, a escolha da
+métrica e da função de perda importa tanto quanto a arquitetura. A ablação mostrou isso de forma direta.
+Em um contexto de PD&amp;I, as evoluções naturais são: (1) <b>análise de sentimento por aspecto</b> (entrega, produto,
+atendimento), que trata os comentários mistos; (2) um conjunto de teste <b>revisado por humanos</b>; (3) calibração
+das probabilidades e um limiar de confiança para encaminhar casos duvidosos à revisão; (4) destilação do modelo para
+reduzir a latência em CPU.</p>
+
+<h2>Referências</h2>
+<ul>
+  <li>SOUZA, F.; NOGUEIRA, R.; LOTUFO, R. BERTimbau: Pretrained BERT Models for Brazilian Portuguese. BRACIS, 2020.</li>
+  <li>OLIST. Brazilian E-Commerce Public Dataset by Olist. Kaggle, 2018. Licença CC BY-NC-SA 4.0.</li>
+  <li>PEDREGOSA, F. et al. Scikit-learn: Machine Learning in Python. JMLR 12, 2011.</li>
+  <li>WOLF, T. et al. Transformers: State-of-the-Art Natural Language Processing. EMNLP (Demos), 2020.</li>
+</ul>
+
+</body>
+</html>

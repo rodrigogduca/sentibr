@@ -1,0 +1,13 @@
+# Comprovante impresso: papel creme, tinta escura, acento tijolo.
+[theme]
+base = "light"
+primaryColor = "#C4452D"
+backgroundColor = "#FAF6EF"
+secondaryBackgroundColor = "#F3EDE2"
+textColor = "#22201C"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false

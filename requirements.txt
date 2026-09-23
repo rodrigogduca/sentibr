@@ -1,0 +1,13 @@
+accelerate==1.15.0
+joblib==1.6.0
+kagglehub==1.0.2
+matplotlib==3.11.2
+nltk==3.10.3
+numpy==2.4.6
+pandas==3.0.6
+pytest==9.1.1
+ruff==0.16.8
+scikit-learn==1.9.1
+streamlit==1.64.0
+torch>=2.4  # GPU: pip install torch --index-url https://download.pytorch.org/whl/cu124
+transformers==4.57.6
