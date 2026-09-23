@@ -40,7 +40,7 @@
         "f1-score": 0.9035
       }
     },
-    "latencia_ms_cpu": 1.57
+    "latencia_ms_cpu": 5.52
   },
   "bertimbau_sem_pesos": {
     "f1_macro": 0.6741,
@@ -64,25 +64,25 @@
     }
   },
   "bertimbau": {
-    "f1_macro": 0.7212,
-    "acuracia": 0.847,
+    "f1_macro": 0.7131,
+    "acuracia": 0.8435,
     "por_classe": {
       "negativo": {
-        "precision": 0.8516,
-        "recall": 0.8549,
-        "f1-score": 0.8532
+        "precision": 0.846,
+        "recall": 0.8536,
+        "f1-score": 0.8498
       },
       "neutro": {
-        "precision": 0.3239,
-        "recall": 0.4663,
-        "f1-score": 0.3822
+        "precision": 0.311,
+        "recall": 0.4376,
+        "f1-score": 0.3636
       },
       "positivo": {
-        "precision": 0.9602,
-        "recall": 0.898,
-        "f1-score": 0.928
+        "precision": 0.9568,
+        "recall": 0.8971,
+        "f1-score": 0.926
       }
     },
-    "latencia_ms_cpu": 73.28
+    "latencia_ms_cpu": 230.41
   }
 }
