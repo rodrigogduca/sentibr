@@ -75,7 +75,9 @@ body, p, li, label, .stMarkdown { font-family: 'Inter', system-ui, sans-serif; }
   font-family: 'Inter', sans-serif; color: var(--tinta);
 }
 .stTextArea textarea:focus { border-color: var(--tinta); box-shadow: none; }
-.stButton button { background: var(--tinta); border: 0; border-radius: 2px; padding: .55rem 1.6rem; }
+.stButton button {
+  background: var(--tinta); border: 0; border-radius: 2px; padding: .55rem 1.6rem;
+}
 .stButton button:hover { background: #3C382F; }
 /* o rótulo vive num <p> interno: sem isto o texto fica escuro sobre escuro */
 .stButton button, .stButton button *, .stButton button p {
